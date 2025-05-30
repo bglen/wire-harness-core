@@ -1,0 +1,15 @@
+{
+  "components": [
+    {"ref": "J1", "type": "Connector", "part": "TE_173977-2", "pins": 12},
+    {"ref": "W1", "type": "Wire", "gauge": "20AWG", "color": "red"}
+  ],
+  "nets": [
+    {
+      "name": "Ignition",
+      "connections": [
+        {"component": "J1", "pin": 1},
+        {"component": "W1", "end": "A"}
+      ]
+    }
+  ]
+}

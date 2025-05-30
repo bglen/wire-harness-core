@@ -1,0 +1,7 @@
+name: "Steering Column Harness"
+description: "Main harness for steering column controls"
+schematic: "schematic.whsch"
+layout3d: "layout3d.wh3d"
+created: 2025-05-30
+author: "Brian Glen"
+version: 1
