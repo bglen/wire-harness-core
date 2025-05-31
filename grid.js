@@ -7,89 +7,34 @@ Manages everything related to grids: drawing, cycling presets, responding to res
 
 */
 
-let _fabricCanvas = null;      // will hold the fabric.Canvas reference
-let _htmlCanvasElem = null;    // the DOM <canvas> element
-let _gridPresets = [20, 50, 100]; // default spacings
-let _currentPresetIndex = 0;   // index into _gridPresets
-let _gridVisible = true;       // toggle if you later want to hide/show
+let _fabricCanvas = null;           // will hold the fabric.Canvas reference
+let _gridPresets = [20, 50, 100];   // default spacings
+let _currentPresetIndex = 0;        // index into _gridPresets
+let _gridVisible = true;            // toggle if you later want to hide/show
+let _resizeTimeout = null;          // resize de-bounce time to reduce workload
 
 /**
- * removeExistingGrid()
- *   - Iterates through all objects on the canvas.
- *   - Any object with `isGrid === true` is removed.
+ * applyGridPattern(spacing)
+ *   - Uses makeGridPatternTile(...) to get a small canvas tile.
+ *   - Wraps that into a Fabric.Image or Fabric.Pattern and sets it as the
+ *     canvas background (tiled). No need to manually iterate lines.
  */
-function removeExistingGrid() {
-  const objs = _fabricCanvas.getObjects().slice(); // copy array to avoid mutation issues
-  for (const obj of objs) {
-    if (obj.isGrid) {
-      _fabricCanvas.remove(obj);
-    }
-  }
-}
+function applyGridPattern(spacing) {
+    if (!_fabricCanvas) return;
 
-/**
- * drawGrid(spacing)
- *  - Removes any previously‐drawn grid group (if present).
- *  - Creates new vertical+horizontal lines at `spacing` px intervals.
- *  - Adds them as a single fabric.Group, sends to back, and re‐renders.
- */
-function drawGrid(spacing) {
-  // 1) Remove any existing grid‐groups
-  removeExistingGrid();
+    // 1) Create the tile
+    const tileElem = makeGridPatternTile(spacing, '#e0e0e0', 1);
 
-  // 2) Get the canvas dimensions
-  const width  = _fabricCanvas.getWidth();
-  const height = _fabricCanvas.getHeight();
+    // 2) Create a Fabric.Pattern directly from the tile element
+    const pattern = new fabric.Pattern({
+        source: tileElem,
+        repeat: 'repeat'
+    });
 
-  // If for some reason width/height is zero, bail out and do not draw:
-  if (width <= 0 || height <= 0) {
-    console.log("One of the window dimensions was zero or negative!")
-    return;
-  }
-
-  console.log("Attempting to draw grid with size " + width + " x " + height);
-
-  // 3) Build all lines into an array
-  const lines = [];
-
-  // 3a) Vertical lines (x = 0, spacing, 2*spacing, …, ≤ width)
-  for (let x = 0; x <= width; x += spacing) {
-    lines.push(
-      new fabric.Line([x, 0, x, height], {
-        stroke: '#e0e0e0',
-        strokeWidth: 1,
-        selectable: false,
-        evented: false,
-      })
-    );
-  }
-
-  // 3b) Horizontal lines (y = 0, spacing, 2*spacing, …, ≤ height)
-  for (let y = 0; y <= height; y += spacing) {
-    lines.push(
-      new fabric.Line([0, y, width, y], {
-        stroke: '#e0e0e0',
-        strokeWidth: 1,
-        selectable: false,
-        evented: false,
-      })
-    );
-  }
-
-  // 4) Group them all together (so removal is easy)
-  const gridGroup = new fabric.Group(lines, {
-    selectable: false,
-    evented: false,
-  });
-
-  gridGroup.isGrid = true;
-
-  // 5) Add to canvas and send to back
-  _fabricCanvas.add(gridGroup);
-  _fabricCanvas.insertAt(0, gridGroup);
-
-  // 6) Force a re-render
-  _fabricCanvas.requestRenderAll();
+    // 3) Assign the Pattern to canvas.backgroundColor
+    //    Then call renderAll() so it takes effect immediately
+    _fabricCanvas.backgroundColor = pattern;
+    _fabricCanvas.renderAll();
 }
 
 /**
@@ -99,10 +44,10 @@ function drawGrid(spacing) {
 function getCanvasPixelSize() {
   const elem = _fabricCanvas.lowerCanvasEl;
   const rect = elem.getBoundingClientRect();
-  const w = Math.floor(rect.width);
-  const h = Math.floor(rect.height);
-  console.log(`[grid.js] getCanvasPixelSize() = ${w}×${h}`);
-  return { width: w, height: h };
+  return {
+     width: Math.floor(rect.width),
+     height: Math.floor(rect.height),
+    };
 }
 
 /**
@@ -113,7 +58,7 @@ function getCanvasPixelSize() {
 function cycleGridPreset() {
   _currentPresetIndex = (_currentPresetIndex + 1) % _gridPresets.length;
   const spacing = _gridPresets[_currentPresetIndex];
-  drawGrid(spacing);
+  applyGridPattern(spacing);
   console.log(`[grid.js] Grid spacing changed to ` + spacing);
 }
 
@@ -151,14 +96,57 @@ function attemptResizeAndRedraw() {
 
   // 2) Draw the grid at the current preset spacing
   const spacing = _gridPresets[_currentPresetIndex];
-  drawGrid(spacing);
+  applyGridPattern(spacing);
 }
 
 /**
  * wrapper function for initializing window
  */
 function resizeWindow() {
-    window.requestAnimationFrame(attemptResizeAndRedraw)
+   clearTimeout(_resizeTimeout);
+  _resizeTimeout = setTimeout(() => {
+    window.requestAnimationFrame(attemptResizeAndRedraw);
+  }, 100);
+}
+
+/**
+ * makeGridPatternTile(spacing, color, lineWidth)
+ *   - spacing:   the width/height of the tile in CSS pixels (e.g. 20, 50).
+ *   - color:     stroke color for the grid lines (e.g. "#e0e0e0").
+ *   - lineWidth: width of the grid lines in pixels (usually 1).
+ *
+ * Returns a native HTMLCanvasElement of size (spacing × spacing),
+ * with a vertical line at x = 0 and a horizontal line at y = 0,
+ * so that when tiled, it forms a continuous grid.
+ */
+export function makeGridPatternTile(spacing = 20, color = '#e0e0e0', lineWidth = 1) {
+  // 1) Create an off-screen canvas
+  const tile = document.createElement('canvas');
+  tile.width  = spacing;
+  tile.height = spacing;
+  const ctx = tile.getContext('2d');
+
+  // 2) Clear to transparent
+  ctx.clearRect(0, 0, spacing, spacing);
+
+  // 3) Draw the vertical line on the left edge
+  ctx.beginPath();
+  ctx.strokeStyle = color;
+  ctx.lineWidth   = lineWidth;
+  // If lineWidth is 1, drawing at x = 0.5 centers the 1px exactly
+  const half = lineWidth / 2;
+  ctx.moveTo(half, 0);
+  ctx.lineTo(half, spacing);
+  ctx.stroke();
+
+  // 4) Draw the horizontal line on the top edge
+  ctx.beginPath();
+  ctx.moveTo(0, half);
+  ctx.lineTo(spacing, half);
+  ctx.stroke();
+
+  // 5) Return the canvas element
+  return tile;
 }
 
 /**
@@ -175,7 +163,6 @@ function resizeWindow() {
  */
 export function initializeGrid(fabricCanvas, htmlCanvasElement, presets = null) {
   _fabricCanvas = fabricCanvas;
-  _htmlCanvasElem = htmlCanvasElement;
 
   if (Array.isArray(presets) && presets.length > 0) {
     _gridPresets = presets.slice(); // clone user’s array
