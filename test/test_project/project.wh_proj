@@ -1,7 +1,32 @@
-name: "Steering Column Harness"
-description: "Main harness for steering column controls"
-schematic: "schematic.whsch"
-layout3d: "layout3d.wh3d"
-created: 2025-05-30
-author: "Brian Glen"
-version: 1
+{
+  "project": {
+    "name": "ECU Main Harness",
+    "version": "1.0.0",
+    "created": "2025-06-12",
+    "author": "Brian Glen",
+    "description": "Main wiring harness for ECU, CAN, and power system."
+  },
+  "settings": {
+    "units": "mm",
+    "grid_size": 10,
+    "wire_color_scheme": "by_signal_type"
+  },
+  "files": {
+    "schematic": "schematic.wh_sch",
+    "layout": "layout.json",
+    "bom": "bom.csv"
+  },
+  "metadata": {
+    "tags": ["ecu", "can", "sensor", "12v"],
+    "revision_history": [
+      {
+        "date": "2025-06-10",
+        "note": "Initial creation"
+      },
+      {
+        "date": "2025-06-11",
+        "note": "Added CAN bus wiring"
+      }
+    ]
+  }
+}

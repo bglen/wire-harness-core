@@ -1,15 +1,11 @@
 {
-  "schematic": {
-    "name": "ECU Main Harness",
-    "format": "wh_sch",
-    "version": "1.0.0",
-    "created": "2025-06-12",
-    "author": "Brian Glen",
-    "description": "Main wiring harness for ECU, CAN, and power system.",
-    "canvas": {
-      "grid_size": 10,
-      "units": "mm"
-    }
+  "format": "wh_sch",
+  "version": "1.0.0",
+  "canvas": {
+    "width": 1600,
+    "height": 1200,
+    "grid_size": 10,
+    "units": "mm"
   },
   "objects": [
     {
@@ -86,5 +82,10 @@
       "name": "GND",
       "nodes": ["J1.3", "J2.3"]
     }
-  ]
+  ],
+  "metadata": {
+    "created": "2025-06-12",
+    "author": "Brian Glen",
+    "description": "Simple schematic connecting ECU to a sensor over CAN with shared ground"
+  }
 }
