@@ -7,6 +7,8 @@ Manages everything related to grids: drawing, cycling presets, responding to res
 
 */
 
+import * as fabric from 'fabric';
+
 let _fabricCanvas = null;           // will hold the fabric.Canvas reference
 let _gridPresets = [20, 50, 100];   // default spacings
 let _currentPresetIndex = 0;        // index into _gridPresets
