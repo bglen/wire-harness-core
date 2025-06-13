@@ -1,3 +1,9 @@
+/*
+ controls.js
+ Brian Glen
+ Manages canvas controls including zoom, pan, scroll
+*/
+
 import * as fabric from 'fabric';
 
 let isDragging = false;
@@ -15,7 +21,7 @@ export function initializeCanvasControls(canvas) {
   canvas.on('mouse:wheel', opt => {
     const delta = opt.e.deltaY;
     let zoom = canvas.getZoom();
-    zoom *= 0.997 ** delta;  
+    zoom *= 0.998 ** delta;  
     zoom = Math.max(0.1, Math.min(20, zoom));  // clamp
     canvas.zoomToPoint(
       { x: opt.e.offsetX, y: opt.e.offsetY },

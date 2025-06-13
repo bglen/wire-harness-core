@@ -1,34 +1,35 @@
 /*
  grid.js
  Brian Glen
-
- Manages grid drawing with major and minor lines, cycling presets, and responsive resize.
+ Manages grid drawing with major/minor lines, zoom-aware crisp rendering, and responsive resize.
 */
 
 import * as fabric from 'fabric';
 
 let _fabricCanvas = null;
-let _gridPresets = [20, 50, 100];   // major grid spacings
-let _currentPresetIndex = 0;
+let _gridPresets = [20, 50, 100];
+let _currentPresetIndex = 2;
 let _gridVisible = true;
 let _resizeTimeout = null;
+let _lastSpacingPx = 0;
 
-/**
- * applyGridPattern(spacing)
- *   - spacing: major grid spacing in CSS pixels.
- *   - draws a tiled pattern of major and minor grid lines.
- */
-function applyGridPattern(spacing) {
+function applyGridPattern(spacingPx) {
   if (!_fabricCanvas) return;
+
+  // Determine subdivisions: skip minor if spacing too small
+  const defaultSubdivisions = 5;
+  const minorThreshold = 10; // px threshold to draw minor lines
+  const subdivisions = spacingPx >= minorThreshold ? defaultSubdivisions : 0;
 
   const majorColor = 'rgba(100, 150, 200, 0.25)';
   const minorColor = 'rgba(100, 150, 200, 0.10)';
   const lineWidthMajor = 1;
   const lineWidthMinor = 0.5;
-  const subdivisions = 5;
+
+  const tileSize = Math.ceil(spacingPx);
 
   const tileElem = makeGridPatternTile(
-    spacing,
+    tileSize,
     majorColor,
     minorColor,
     lineWidthMajor,
@@ -42,7 +43,6 @@ function applyGridPattern(spacing) {
   });
 
   _fabricCanvas.backgroundColor = pattern;
-  _fabricCanvas.renderAll();
 }
 
 function getCanvasPixelSize() {
@@ -56,9 +56,10 @@ function getCanvasPixelSize() {
 
 function cycleGridPreset() {
   _currentPresetIndex = (_currentPresetIndex + 1) % _gridPresets.length;
-  const spacing = _gridPresets[_currentPresetIndex];
-  applyGridPattern(spacing);
-  console.log(`[grid.js] Grid spacing changed to ${spacing}`);
+  const baseSpacing = _gridPresets[_currentPresetIndex];
+  redrawGrid(baseSpacing);
+  _fabricCanvas.requestRenderAll();
+  console.log(`[grid.js] Grid spacing changed to ${baseSpacing}`);
 }
 
 function onKeyDown(e) {
@@ -78,8 +79,9 @@ function attemptResizeAndRedraw() {
   _fabricCanvas.setWidth(w);
   _fabricCanvas.setHeight(h);
 
-  const spacing = _gridPresets[_currentPresetIndex];
-  applyGridPattern(spacing);
+  const baseSpacing = _gridPresets[_currentPresetIndex];
+  redrawGrid(baseSpacing);
+  _fabricCanvas.requestRenderAll();
 }
 
 function resizeWindow() {
@@ -89,16 +91,19 @@ function resizeWindow() {
   }, 100);
 }
 
+function redrawGrid(baseSpacing) {
+  const zoom = _fabricCanvas.getZoom() || 1;
+  const spacingPx = baseSpacing * zoom;
+
+  // Only redraw if spacing change significant
+  if (Math.abs(spacingPx - _lastSpacingPx) > 1) {
+    applyGridPattern(spacingPx);
+    _lastSpacingPx = spacingPx;
+  }
+}
+
 /**
  * makeGridPatternTile(majorSpacing, majorColor, minorColor, lineWidthMajor, lineWidthMinor, subdivisions)
- *   - majorSpacing: size of the tile (pixel), distance between major lines.
- *   - majorColor: CSS stroke color for major lines.
- *   - minorColor: CSS stroke color for minor lines.
- *   - lineWidthMajor: stroke width for major lines.
- *   - lineWidthMinor: stroke width for minor lines.
- *   - subdivisions: number of minor cells between major lines.
- *
- * Returns an off-screen canvas element tiled for the background.
  */
 export function makeGridPatternTile(
   majorSpacing = 20,
@@ -112,21 +117,24 @@ export function makeGridPatternTile(
   tile.width = majorSpacing;
   tile.height = majorSpacing;
   const ctx = tile.getContext('2d');
+  ctx.imageSmoothingEnabled = false;
   ctx.clearRect(0, 0, majorSpacing, majorSpacing);
 
   // Draw minor grid lines
-  const minorStep = majorSpacing / subdivisions;
-  ctx.beginPath();
-  ctx.strokeStyle = minorColor;
-  ctx.lineWidth = lineWidthMinor;
-  for (let i = 1; i < subdivisions; i++) {
-    const pos = i * minorStep + lineWidthMinor / 2;
-    ctx.moveTo(pos, 0);
-    ctx.lineTo(pos, majorSpacing);
-    ctx.moveTo(0, pos);
-    ctx.lineTo(majorSpacing, pos);
+  if (subdivisions > 0) {
+    const minorStep = majorSpacing / subdivisions;
+    ctx.beginPath();
+    ctx.strokeStyle = minorColor;
+    ctx.lineWidth = lineWidthMinor;
+    for (let i = 1; i < subdivisions; i++) {
+      const pos = i * minorStep + lineWidthMinor / 2;
+      ctx.moveTo(pos, 0);
+      ctx.lineTo(pos, majorSpacing);
+      ctx.moveTo(0, pos);
+      ctx.lineTo(majorSpacing, pos);
+    }
+    ctx.stroke();
   }
-  ctx.stroke();
 
   // Draw major grid lines
   ctx.beginPath();
@@ -153,23 +161,36 @@ export function initializeGrid(fabricCanvas, htmlCanvasElement, presets = null) 
   }
 
   _currentPresetIndex = 0;
-  resizeWindow();
+  attemptResizeAndRedraw();
+
   window.addEventListener('keydown', onKeyDown);
   window.addEventListener('resize', resizeWindow);
+
+  // Watch zoom changes, but do not trigger another render here
+  _fabricCanvas.on('before:render', () => {
+    const ctx = _fabricCanvas.contextContainer;
+    if (ctx.imageSmoothingEnabled !== false) {
+      ctx.imageSmoothingEnabled = false;
+    }
+    const baseSpacing = _gridPresets[_currentPresetIndex];
+    redrawGrid(baseSpacing);
+  });
 }
 
 export function hideGrid() {
   _gridVisible = false;
   if (_fabricCanvas) {
     _fabricCanvas.backgroundColor = null;
-    _fabricCanvas.renderAll();
+    _fabricCanvas.requestRenderAll();
   }
 }
 
 export function showGrid() {
   _gridVisible = true;
   if (_fabricCanvas) {
-    applyGridPattern(_gridPresets[_currentPresetIndex]);
+    const baseSpacing = _gridPresets[_currentPresetIndex];
+    redrawGrid(baseSpacing);
+    _fabricCanvas.requestRenderAll();
   }
 }
 
@@ -179,4 +200,15 @@ export function toggleGridVisibility() {
   } else {
     showGrid();
   }
+}
+
+/**
+ * getGridInfo(canvas)
+ * Returns the base spacing in world units and the current zoomed pixel spacing.
+ */
+export function getGridInfo(canvas) {
+  const baseSpacing = _gridPresets[_currentPresetIndex];
+  const zoom = canvas.getZoom() || 1;
+  const zoomedSpacing = baseSpacing * zoom;
+  return { baseSpacing, zoomedSpacing };
 }
