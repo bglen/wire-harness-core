@@ -25,7 +25,7 @@ function applyGridPattern(spacing) {
     if (!_fabricCanvas) return;
 
     // 1) Create the tile
-    const tileElem = makeGridPatternTile(spacing, '#e0e0e0', 1);
+    const tileElem = makeGridPatternTile(spacing, 'rgba(100, 150, 200, 0.25)', 1);
 
     // 2) Create a Fabric.Pattern directly from the tile element
     const pattern = new fabric.Pattern({
@@ -121,7 +121,7 @@ function resizeWindow() {
  * with a vertical line at x = 0 and a horizontal line at y = 0,
  * so that when tiled, it forms a continuous grid.
  */
-export function makeGridPatternTile(spacing = 20, color = '#e0e0e0', lineWidth = 1) {
+export function makeGridPatternTile(spacing = 20, color = '#rgba(100, 150, 200, 0.08)', lineWidth = 1) {
   // 1) Create an off-screen canvas
   const tile = document.createElement('canvas');
   tile.width  = spacing;
